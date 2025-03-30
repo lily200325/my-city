@@ -85,6 +85,7 @@
             padding: 16px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             position: relative;
+            padding-left: 36px; /* 为拖动手柄留出空间 */
         }
 
         .city-name {
@@ -245,6 +246,61 @@
             font-size: 0.9rem;
         }
 
+        .drag-handle {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            font-size: 1.2rem;
+            color: #94a3b8;
+            cursor: move;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            user-select: none;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .drag-handle:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .city-card:hover .drag-handle {
+            opacity: 1;
+        }
+
+        .city-card.dragging {
+            opacity: 0.5;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-actions {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .city-card:hover .card-actions {
+            opacity: 1;
+        }
+
+        .action-icon {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #94a3b8;
+            padding: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .action-icon:hover {
+            color: var(--primary-color);
+        }
+
         @media (min-width: 640px) {
             .header-content {
                 flex-direction: row;
@@ -274,6 +330,15 @@
         @media (min-width: 1024px) {
             .city-grid {
                 grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .drag-handle {
+                opacity: 0.5;
+            }
+            .card-actions {
+                opacity: 1;
             }
         }
     </style>
@@ -446,6 +511,9 @@
         function setupDragAndDrop() {
             const cards = document.querySelectorAll('.city-card');
             cards.forEach(card => {
+                // 默认禁用拖动，只有按住手柄时才能拖动
+                card.draggable = false;
+
                 card.addEventListener('dragstart', (e) => {
                     draggedCard = card;
                     card.classList.add('dragging');
@@ -454,6 +522,7 @@
                 card.addEventListener('dragend', () => {
                     card.classList.remove('dragging');
                     draggedCard = null;
+                    updateCityOrder();
                 });
 
                 card.addEventListener('dragover', (e) => {
@@ -489,11 +558,29 @@
             }
         }
 
+        function moveCity(cityId, direction) {
+            const index = cities.findIndex(city => city.id === cityId);
+            if (direction === 'up' && index > 0) {
+                // 向上移动
+                [cities[index], cities[index - 1]] = [cities[index - 1], cities[index]];
+                saveData();
+                renderCities();
+            } else if (direction === 'down' && index < cities.length - 1) {
+                // 向下移动
+                [cities[index], cities[index + 1]] = [cities[index + 1], cities[index]];
+                saveData();
+                renderCities();
+            }
+        }
+
         function renderCities() {
             const cityGrid = document.getElementById('cityGrid');
-            cityGrid.innerHTML = cities.map(city => `
+            cityGrid.innerHTML = cities.map((city, index) => `
                 <div class="city-card" draggable="true" data-city-id="${city.id}">
-                    <button class="delete-city-btn" onclick="deleteCity(${city.id})">×</button>
+                    <div class="drag-handle" onmousedown="event.target.parentElement.draggable = true" onmouseup="event.target.parentElement.draggable = false">⋮⋮</div>
+                    <div class="card-actions">
+                        <button class="action-icon" onclick="deleteCity(${city.id})">×</button>
+                    </div>
                     <h2 class="city-name">${city.name}</h2>
                     <div class="experiences">
                         ${city.experiences.map(exp => `
