@@ -258,19 +258,43 @@
             user-select: none;
             padding: 4px;
             border-radius: 4px;
+            pointer-events: none;
+        }
+
+        .drag-handle.show {
+            opacity: 1;
+            pointer-events: auto;
         }
 
         .drag-handle:hover {
             background-color: rgba(0, 0, 0, 0.05);
         }
 
-        .city-card:hover .drag-handle {
-            opacity: 1;
+        .drag-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 48px;
+            height: 48px;
+            cursor: move;
         }
 
-        .city-card.dragging {
-            opacity: 0.5;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        .delete-area {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 48px;
+            height: 48px;
+            cursor: pointer;
+        }
+
+        .city-card {
+            background: var(--card-background);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            position: relative;
+            padding-left: 36px;
         }
 
         .card-actions {
@@ -281,10 +305,12 @@
             gap: 8px;
             opacity: 0;
             transition: opacity 0.2s ease;
+            pointer-events: none;
         }
 
-        .city-card:hover .card-actions {
+        .card-actions.show {
             opacity: 1;
+            pointer-events: auto;
         }
 
         .action-icon {
@@ -334,11 +360,9 @@
         }
 
         @media (max-width: 640px) {
-            .drag-handle {
-                opacity: 0.5;
-            }
-            .card-actions {
-                opacity: 1;
+            .drag-handle.show,
+            .card-actions.show {
+                opacity: 0.8;
             }
         }
     </style>
@@ -608,11 +632,9 @@
             const cityGrid = document.getElementById('cityGrid');
             cityGrid.innerHTML = cities.map((city, index) => `
                 <div class="city-card" draggable="true" data-city-id="${city.id}">
-                    <div class="drag-handle" 
-                        onmousedown="event.target.parentElement.draggable = true" 
-                        onmouseup="event.target.parentElement.draggable = false"
-                        ontouchstart="event.target.parentElement.draggable = true" 
-                        ontouchend="event.target.parentElement.draggable = false">⋮⋮</div>
+                    <div class="drag-area"></div>
+                    <div class="delete-area"></div>
+                    <div class="drag-handle">⋮⋮</div>
                     <div class="card-actions">
                         <button class="action-icon" onclick="deleteCity(${city.id})">×</button>
                     </div>
@@ -645,6 +667,55 @@
             `).join('');
 
             setupDragAndDrop();
+            setupCardInteractions();
+        }
+
+        function setupCardInteractions() {
+            const cards = document.querySelectorAll('.city-card');
+            cards.forEach(card => {
+                const dragArea = card.querySelector('.drag-area');
+                const deleteArea = card.querySelector('.delete-area');
+                const dragHandle = card.querySelector('.drag-handle');
+                const cardActions = card.querySelector('.card-actions');
+
+                // 拖动区域交互
+                dragArea.addEventListener('mouseenter', () => {
+                    dragHandle.classList.add('show');
+                });
+                dragArea.addEventListener('mouseleave', () => {
+                    if (!card.draggable) {
+                        dragHandle.classList.remove('show');
+                    }
+                });
+
+                // 删除区域交互
+                deleteArea.addEventListener('mouseenter', () => {
+                    cardActions.classList.add('show');
+                });
+                deleteArea.addEventListener('mouseleave', () => {
+                    cardActions.classList.remove('show');
+                });
+
+                // 触摸事件支持
+                dragArea.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    dragHandle.classList.add('show');
+                    card.draggable = true;
+                });
+
+                deleteArea.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    cardActions.classList.add('show');
+                });
+
+                card.addEventListener('touchend', () => {
+                    setTimeout(() => {
+                        dragHandle.classList.remove('show');
+                        cardActions.classList.remove('show');
+                        card.draggable = false;
+                    }, 300);
+                });
+            });
         }
 
         // 初始化渲染
