@@ -85,7 +85,15 @@
             padding: 16px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
             position: relative;
-            padding-left: 36px; /* 为拖动手柄留出空间 */
+            padding-left: 48px;
+            transition: transform 0.2s ease;
+        }
+
+        .city-card.dragging {
+            opacity: 0.8;
+            background: #f8fafc;
+            transform: scale(1.02);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
         }
 
         .city-name {
@@ -184,21 +192,54 @@
             gap: 4px;
         }
 
-        .delete-city-btn {
+        .drag-handle {
             position: absolute;
-            top: 12px;
-            right: 12px;
+            top: 0;
+            left: 0;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            cursor: move;
+            font-size: 1.2rem;
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
             background: none;
             border: none;
-            font-size: 1.2rem;
-            color: #94a3b8;
-            padding: 4px;
-            opacity: 0;
-            transition: opacity 0.2s ease;
+            padding: 0;
+            touch-action: none;
         }
 
-        .city-card:hover .delete-city-btn {
+        .drag-handle:hover {
             opacity: 1;
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 1.2rem;
+            opacity: 0.6;
+            transition: opacity 0.2s ease;
+            background: none;
+            border: none;
+            padding: 0;
+            border-radius: 50%;
+        }
+
+        .delete-btn:hover {
+            opacity: 1;
+            background-color: rgba(0, 0, 0, 0.05);
         }
 
         .modal {
@@ -246,87 +287,6 @@
             font-size: 0.9rem;
         }
 
-        .drag-handle {
-            position: absolute;
-            top: 12px;
-            left: 12px;
-            font-size: 1.2rem;
-            color: #94a3b8;
-            cursor: move;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            user-select: none;
-            padding: 4px;
-            border-radius: 4px;
-            pointer-events: none;
-        }
-
-        .drag-handle.show {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .drag-handle:hover {
-            background-color: rgba(0, 0, 0, 0.05);
-        }
-
-        .drag-area {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 48px;
-            height: 48px;
-            cursor: move;
-        }
-
-        .delete-area {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 48px;
-            height: 48px;
-            cursor: pointer;
-        }
-
-        .city-card {
-            background: var(--card-background);
-            border-radius: 16px;
-            padding: 16px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            position: relative;
-            padding-left: 36px;
-        }
-
-        .card-actions {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            display: flex;
-            gap: 8px;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            pointer-events: none;
-        }
-
-        .card-actions.show {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .action-icon {
-            background: none;
-            border: none;
-            font-size: 1.2rem;
-            color: #94a3b8;
-            padding: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .action-icon:hover {
-            color: var(--primary-color);
-        }
-
         @media (min-width: 640px) {
             .header-content {
                 flex-direction: row;
@@ -360,8 +320,7 @@
         }
 
         @media (max-width: 640px) {
-            .drag-handle.show,
-            .card-actions.show {
+            .drag-handle {
                 opacity: 0.8;
             }
         }
@@ -533,65 +492,101 @@
         }
 
         function setupDragAndDrop() {
-            const cards = document.querySelectorAll('.city-card');
-            cards.forEach(card => {
-                // 默认禁用拖动，只有按住手柄时才能拖动
-                card.draggable = false;
-
-                card.addEventListener('dragstart', (e) => {
-                    draggedCard = card;
-                    card.classList.add('dragging');
-                    // 防止拖动时出现半透明效果
-                    if (e.dataTransfer) {
-                        e.dataTransfer.effectAllowed = 'move';
-                    }
-                });
-
-                card.addEventListener('dragend', () => {
-                    card.classList.remove('dragging');
-                    draggedCard = null;
-                    updateCityOrder();
-                    // 重置拖动状态
-                    card.draggable = false;
-                });
-
-                // 添加触摸事件支持
-                card.addEventListener('touchmove', (e) => {
-                    if (!card.draggable) return;
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    const target = document.elementFromPoint(touch.clientX, touch.clientY);
-                    const targetCard = target?.closest('.city-card');
+            const cityGrid = document.getElementById('cityGrid');
+            let draggedCard = null;
+            let isDragging = false;
+            let startY = 0;
+            let startX = 0;
+            let initialY = 0;
+            let initialX = 0;
+        
+            function onDragStart(e, card, clientX, clientY) {
+                isDragging = true;
+                draggedCard = card;
+                const rect = card.getBoundingClientRect();
+                
+                // 设置拖动卡片的样式
+                card.classList.add('dragging');
+                
+                // 记录初始位置和偏移量
+                startX = clientX - rect.left;
+                startY = clientY - rect.top;
+                initialX = rect.left;
+                initialY = rect.top;
+            }
+        
+            function onDragMove(e, clientX, clientY) {
+                if (!isDragging) return;
+                e.preventDefault();
+        
+                // 获取当前位置下的元素
+                const target = document.elementFromPoint(clientX, clientY);
+                const targetCard = target?.closest('.city-card');
+        
+                if (targetCard && targetCard !== draggedCard) {
+                    // 获取所有卡片
+                    const cards = Array.from(document.querySelectorAll('.city-card'));
+                    const draggedIndex = cards.indexOf(draggedCard);
+                    const targetIndex = cards.indexOf(targetCard);
                     
-                    if (targetCard && targetCard !== card) {
-                        const rect = targetCard.getBoundingClientRect();
-                        const midY = rect.top + rect.height / 2;
-                        if (touch.clientY < midY) {
-                            targetCard.parentNode.insertBefore(card, targetCard);
-                        } else {
-                            targetCard.parentNode.insertBefore(card, targetCard.nextSibling);
-                        }
+                    // 如果拖动的卡片在目标卡片之前，则将拖动卡片插入到目标卡片之后
+                    // 否则，将拖动卡片插入到目标卡片之前
+                    if (draggedIndex < targetIndex) {
+                        targetCard.parentNode.insertBefore(draggedCard, targetCard.nextSibling);
+                    } else {
+                        targetCard.parentNode.insertBefore(draggedCard, targetCard);
+                    }
+                }
+            }
+        
+            function onDragEnd() {
+                if (!isDragging) return;
+                isDragging = false;
+        
+                // 恢复卡片样式
+                draggedCard.classList.remove('dragging');
+        
+                // 更新顺序
+                updateCityOrder();
+                draggedCard = null;
+            }
+        
+            // 鼠标事件
+            document.addEventListener('mousemove', (e) => {
+                onDragMove(e, e.clientX, e.clientY);
+            });
+        
+            document.addEventListener('mouseup', onDragEnd);
+        
+            // 触摸事件
+            document.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    onDragMove(e, e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: false });
+        
+            document.addEventListener('touchend', onDragEnd);
+        
+            // 为每个拖动手柄添加事件监听
+            const handles = document.querySelectorAll('.drag-handle');
+            handles.forEach(handle => {
+                handle.addEventListener('mousedown', (e) => {
+                    e.preventDefault(); // 防止文本选择
+                    const card = handle.closest('.city-card');
+                    if (card) {
+                        onDragStart(e, card, e.clientX, e.clientY);
                     }
                 });
-
-                card.addEventListener('touchend', () => {
-                    if (!card.draggable) return;
-                    card.draggable = false;
-                    updateCityOrder();
-                });
-
-                card.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    if (card !== draggedCard) {
-                        const rect = card.getBoundingClientRect();
-                        const midY = rect.top + rect.height / 2;
-                        if (e.clientY < midY) {
-                            card.parentNode.insertBefore(draggedCard, card);
-                        } else {
-                            card.parentNode.insertBefore(draggedCard, card.nextSibling);
+        
+                handle.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); // 防止滚动
+                    if (e.touches.length > 0) {
+                        const card = handle.closest('.city-card');
+                        if (card) {
+                            onDragStart(e, card, e.touches[0].clientX, e.touches[0].clientY);
                         }
                     }
-                });
+                }, { passive: false });
             });
         }
 
@@ -631,13 +626,9 @@
         function renderCities() {
             const cityGrid = document.getElementById('cityGrid');
             cityGrid.innerHTML = cities.map((city, index) => `
-                <div class="city-card" draggable="true" data-city-id="${city.id}">
-                    <div class="drag-area"></div>
-                    <div class="delete-area"></div>
-                    <div class="drag-handle">⋮⋮</div>
-                    <div class="card-actions">
-                        <button class="action-icon" onclick="deleteCity(${city.id})">×</button>
-                    </div>
+                <div class="city-card" data-city-id="${city.id}">
+                    <button class="drag-handle" type="button">⋮⋮</button>
+                    <button class="delete-btn" type="button" onclick="deleteCity(${city.id})">×</button>
                     <h2 class="city-name">${city.name}</h2>
                     <div class="experiences">
                         ${city.experiences.map(exp => `
@@ -667,59 +658,10 @@
             `).join('');
 
             setupDragAndDrop();
-            setupCardInteractions();
-        }
-
-        function setupCardInteractions() {
-            const cards = document.querySelectorAll('.city-card');
-            cards.forEach(card => {
-                const dragArea = card.querySelector('.drag-area');
-                const deleteArea = card.querySelector('.delete-area');
-                const dragHandle = card.querySelector('.drag-handle');
-                const cardActions = card.querySelector('.card-actions');
-
-                // 拖动区域交互
-                dragArea.addEventListener('mouseenter', () => {
-                    dragHandle.classList.add('show');
-                });
-                dragArea.addEventListener('mouseleave', () => {
-                    if (!card.draggable) {
-                        dragHandle.classList.remove('show');
-                    }
-                });
-
-                // 删除区域交互
-                deleteArea.addEventListener('mouseenter', () => {
-                    cardActions.classList.add('show');
-                });
-                deleteArea.addEventListener('mouseleave', () => {
-                    cardActions.classList.remove('show');
-                });
-
-                // 触摸事件支持
-                dragArea.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    dragHandle.classList.add('show');
-                    card.draggable = true;
-                });
-
-                deleteArea.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    cardActions.classList.add('show');
-                });
-
-                card.addEventListener('touchend', () => {
-                    setTimeout(() => {
-                        dragHandle.classList.remove('show');
-                        cardActions.classList.remove('show');
-                        card.draggable = false;
-                    }, 300);
-                });
-            });
         }
 
         // 初始化渲染
         renderCities();
     </script>
 </body>
-</html> 
+</html>
